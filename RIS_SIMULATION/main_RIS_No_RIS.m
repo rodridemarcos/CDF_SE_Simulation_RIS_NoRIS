@@ -2,67 +2,67 @@
 close all;
 clear;
 clc;
-%% --- USER CONFIGURABLE INPUTS --- %%
-frequencies = 2e9;    % Frequencies (Hz) for simulation (fixed to 15 GHz as requested)
-LOS_settings = 3;      % Line-of-Sight (LOS) configurations (fixed to 3 as requested)
-precoders = ["MR", "MMSE", "RZF"];      % Precoding schemes to simulate
-ris_options = "RIS";        % Scenarios to simulate: with RIS or without (fixed to RIS as requested)
+%% --- ENTRADAS CONFIGURABLES POR EL USUARIO --- %%
+frequencies = [2e9,8e9,15e9,28e9];    % Frecuencias (Hz) para la simulación (fijo en 15 GHz como se solicitó)
+LOS_settings = 3;      % Configuraciones de Línea de Vista (LOS) (9 LOS y 1 NLOS)
+precoders = ["MR", "MMMSE"];      % Esquemas de precodificación a simular [MR, MMMSE, RZF]
+ris_options = "RIS";        % Escenarios a simular: con RIS o sin RIS (fijo en RIS como se solicitó)
 
-%% --- FIXED SIMULATION PARAMETERS --- %%
-L = 4;                 % Number of cells (Base Stations - BS)
-K = 10;                % Number of users (User Equipments - UE) per cell
-M = 40;                % Number of antennas at each BS (M = Mmax)
-Mmax = M;              % Alias for maximum number of antennas at the BS
-N_ris = 100;            % Number of elements in the RIS
-nbrOfSetups = 100;       % Number of network setups to average over
-nbrOfRealizations = 100; % Number of channel realizations per setup (for averaging within a setup)
-B = 20e6;              % System bandwidth (Hz)
-p = 0.1;               % Transmit power per UE (W)
-noiseFigure = 7;       % Receiver noise figure (dB)
-noiseVariancedBm = -174 + 10*log10(B) + noiseFigure; % Noise variance in dBm
-noiseVarianceW = db2pow(noiseVariancedBm - 30); % Noise variance in Watts
-tau_c = 200;           % Channel coherence length (symbols)
-tau_p = K;             % Pilot sequence length (symbols)
-f = 1;                 % Factor for noise power calculation (typically 1 for AWGN noise)
-ASDdeg = 10;           % Angular Spread of Departures/Arrivals (degrees)
-scenario = 'UMi';      % Propagation scenario (e.g. Urban Macro, Urban Micro)
-scenario_str = scenario; % Scenario name as string for results structure
+%% --- PARÁMETROS FIJOS DE SIMULACIÓN --- %%
+L = 4;                 % Número de celdas (Estaciones Base - BS)
+K = 10;                % Número de usuarios (Equipos de Usuario - UE) por celda
+M = 40;                % Número de antenas en cada BS (M = Mmax)
+Mmax = M;              % Alias para el número máximo de antenas en la BS
+N_ris = 50;            % Número de elementos en el RIS [50,100,200]
+nbrOfSetups = 100;       % Número de configuraciones de red para promediar
+nbrOfRealizations = 100; % Número de realizaciones de canal por configuración (para promediar dentro de una configuración)
+B = 20e6;              % Ancho de banda del sistema (Hz)
+p = 0.1;               % Potencia de transmisión por UE (W)
+noiseFigure = 7;       % Figura de ruido del receptor (dB)
+noiseVariancedBm = -174 + 10*log10(B) + noiseFigure; % Varianza del ruido en dBm
+noiseVarianceW = db2pow(noiseVariancedBm - 30); % Varianza del ruido en Watts
+tau_c = 200;           % Longitud de coherencia de canal (símbolos)
+tau_p = K;             % Longitud de la secuencia piloto (símbolos)
+f = 1;                 % Factor de reutilización de secuencias piloto
+ASDdeg = 10;           % Dispersión angular de salidas/llegadas (grados)
+scenario = 'UMi';      % Escenario de propagación (por ejemplo: Urbano Macro, Urbano Micro)
+scenario_str = scenario; % Nombre del escenario como cadena para la estructura de resultados
 
-% Structure to store the raw SE data for the worst (NLOS) users, per cell
-% This will be L (cells) x nbrOfSetups (setups) for each precoder
+% Estructura para almacenar los datos brutos de SE para el peor usuario (NLOS), por celda
+% Esto será L (celdas) x nbrOfSetups (configuraciones) para cada precodificador
 results_worst_user_raw = struct();
 results_best_users_raw = struct();  
 results_all_users_raw = struct();   
 
-%% --- MAIN SIMULATION LOOP --- %%
-for freq_idx = 1:length(frequencies) % Loop over different frequencies (only 15 GHz)
+%% --- BUCLE PRINCIPAL DE SIMULACIÓN --- %%
+for freq_idx = 1:length(frequencies) % Bucle sobre diferentes frecuencias (2,8,15,28)
     frequency = frequencies(freq_idx);
     freq_str = ['f_', strrep(num2str(frequency/1e9), '.', 'p')];
     
-    for los_idx = 1:length(LOS_settings) % Loop over different LOS configurations (only LoS=3)
+    for los_idx = 1:length(LOS_settings) % Bucle sobre diferentes configuraciones LOS (solo LoS=3)
         LoS_setting = LOS_settings(los_idx);
         
-        for ris_idx = 1:length(ris_options) % Loop over scenarios with/without RIS (only RIS)
+        for ris_idx = 1:length(ris_options) % Bucle sobre escenarios con/sin RIS (solo RIS)
             ris_flag = ris_options{ris_idx};
             isRIS = strcmp(ris_flag, 'RIS');
             
-            fprintf('Simulating for %s at f = %.0f GHz (LoS=%d %s RIS)\n', ...
+            fprintf('Simulando para %s en f = %.0f GHz (LoS=%d %s RIS)\n', ...
                 scenario, frequency/1e9, LoS_setting, ris_flag);
 
-            % Initialize storage for raw worst-user SE data for the current freq/LoS/RIS combo
+            % Inicializar almacenamiento para datos brutos de SE del peor usuario para la combinación freq/LoS/RIS actual
             for prec_idx = 1:length(precoders)
                 prec = precoders{prec_idx};
-                % Initialize with zeros: L rows (one for each cell), nbrOfSetups columns
+                % Inicializar con ceros: L filas (una por cada celda), nbrOfSetups columnas
                 results_worst_user_raw.(freq_str).(ris_flag).(prec) = zeros(L, nbrOfSetups);
                 results_best_users_raw.(freq_str).(ris_flag).(prec) = cell(L, nbrOfSetups);
                 results_all_users_raw.(freq_str).(ris_flag).(prec) = cell(L, nbrOfSetups);
             end
             
-            for n_setup = 1:nbrOfSetups % Loop over different network setups
-                rng(n_setup); % Set seed for reproducibility of each setup
+            for n_setup = 1:nbrOfSetups % Bucle sobre diferentes configuraciones de red
+                rng(n_setup); % Fijar semilla para la reproducibilidad de cada configuración
                 
                 if isRIS
-                    % --- SIMULATION WITH RIS ---
+                    % --- SIMULACIÓN CON RIS ---
                     [R_BS_UE, HMean_BS_UE, GdB_BS_UE, Kappa_BS_UE, P_LOS_BS_UE, ...
                      R_UE_RIS, HMean_UE_RIS, GdB_UE_RIS, Kappa_UE_RIS, P_LOS_UE_RIS, ...
                      R_BS_RIS_BSAnt, R_BS_RIS_RISel, HMean_BS_RIS, GdB_BS_RIS, Kappa_BS_RIS, P_LOS_BS_RIS, ...
@@ -93,24 +93,24 @@ for freq_idx = 1:length(frequencies) % Loop over different frequencies (only 15 
                     [Hhat, C] = functionChannelEstimateMMSE(Req, HMean_BS_UE, Heq, nbrOfRealizations, Mmax, K, L, p, f, tau_p);
                 end
                 
-                [SE_MR, SE_RZF, SE_MMSE] = functionComputeSE_UL(Hhat, C, Req, tau_c, tau_p, nbrOfRealizations, Mmax, K, L, p, noiseVarianceW);
+                [SE_MR, SE_RZF, SE_MMMSE] = functionComputeSE_UL(Hhat, C, Req, tau_c, tau_p, nbrOfRealizations, Mmax, K, L, p, noiseVarianceW);
                 
-                % Store SE results for the worst user per cell directly into results_worst_user_raw
-                for l_cell = 1:L % Loop through each cell
-                    % worstIdx(l_cell) gives the user index for the worst user in cell l_cell
+                % Almacenar resultados de SE para el peor usuario por celda directamente en results_worst_user_raw
+                for l_cell = 1:L % Bucle a través de cada celda
+                    % worstIdx(l_cell) da el índice del usuario peor en la celda l_cell
                     results_worst_user_raw.(freq_str).(ris_flag).MR(l_cell, n_setup) = SE_MR(worstIdx(l_cell), l_cell);
-                    results_worst_user_raw.(freq_str).(ris_flag).MMSE(l_cell, n_setup) = SE_MMSE(worstIdx(l_cell), l_cell);
-                    results_worst_user_raw.(freq_str).(ris_flag).RZF(l_cell, n_setup) = SE_RZF(worstIdx(l_cell), l_cell);
+                    results_worst_user_raw.(freq_str).(ris_flag).MMSE(l_cell, n_setup) = SE_MMMSE(worstIdx(l_cell), l_cell);
+                    %results_worst_user_raw.(freq_str).(ris_flag).RZF(l_cell, n_setup) = SE_RZF(worstIdx(l_cell), l_cell);
                     
                     best_users = setdiff(1:K, worstIdx(l_cell)); % Los 9 mejores en cada celda
                     results_best_users_raw.(freq_str).(ris_flag).MR{l_cell, n_setup} = SE_MR(best_users, l_cell);
-                    results_best_users_raw.(freq_str).(ris_flag).MMSE{l_cell, n_setup} = SE_MMSE(best_users, l_cell);
-                    results_best_users_raw.(freq_str).(ris_flag).RZF{l_cell, n_setup} = SE_RZF(best_users, l_cell);
+                    results_best_users_raw.(freq_str).(ris_flag).MMSE{l_cell, n_setup} = SE_MMMSE(best_users, l_cell);
+                    %results_best_users_raw.(freq_str).(ris_flag).RZF{l_cell, n_setup} = SE_RZF(best_users, l_cell);
                 
-                    % Almacenar todos los usuarios (para posible análisis global)
+                    % Almacenar SE para todos los usuarios combinados (LOS & NLOS)
                     results_all_users_raw.(freq_str).(ris_flag).MR{l_cell, n_setup} = SE_MR(:, l_cell);
-                    results_all_users_raw.(freq_str).(ris_flag).MMSE{l_cell, n_setup} = SE_MMSE(:, l_cell);
-                    results_all_users_raw.(freq_str).(ris_flag).RZF{l_cell, n_setup} = SE_RZF(:, l_cell);
+                    results_all_users_raw.(freq_str).(ris_flag).MMSE{l_cell, n_setup} = SE_MMMSE(:, l_cell);
+                    %results_all_users_raw.(freq_str).(ris_flag).RZF{l_cell, n_setup} = SE_RZF(:, l_cell);
                 end
 
                 fprintf('Configuración %d (%s, %.0f GHz, LoS=%d %s) Completada.\n', ...
@@ -120,61 +120,68 @@ for freq_idx = 1:length(frequencies) % Loop over different frequencies (only 15 
     end
 end
 
-%%Graficar las figuras:
-%% --- GRÁFICAS --- %%
-colors_prec = containers.Map({'MMSE','RZF','MR'}, {'k','b','r'});
 
-plot_frequency = frequencies(1);
-freq_str_plot = ['f_', strrep(num2str(plot_frequency/1e9), '.', 'p')];
-scenario_plot = scenario;
-ris_flag_plot = ris_options{1};
-plot_LoS_setting = LOS_settings(1);
+%% --- FIGURAS --- %%
+colors_prec = containers.Map({'MMMSE','MR'}, {'k','r'});
 
-% ---------- Worst Users ----------
-figure('Name', 'CDF: Worst Users'); hold on; box on; grid on;
-for prec = precoders
-    data = results_worst_user_raw.(freq_str_plot).(ris_flag_plot).(char(prec));
-    data_vec = data(:);
-    plot(sort(data_vec), linspace(0,1,length(data_vec))', ...
-        [colors_prec(char(prec)) '-'], 'DisplayName', [char(prec) ' (Worst)']);
-end
-xlabel('SE [bit/s/Hz]'); ylabel('CDF');
-title('CDF - Worst Users'); legend('Location','SouthEast');
-savefig('CDF_WorstUsers.fig');
+for freq_idx = 1:length(frequencies)
+    plot_frequency = frequencies(freq_idx);
+    freq_str_plot = ['f_', strrep(num2str(plot_frequency/1e9), '.', 'p')];
+    scenario_plot = scenario;
+    ris_flag_plot = ris_options{1};  % Solo "RIS"
+    plot_LoS_setting = LOS_settings(1); % Solo LoS=3
 
-% ---------- Best Users ----------
-figure('Name', 'CDF: Best Users'); hold on; box on; grid on;
-for prec = precoders
-    data_all = [];
-    for l=1:L
-        for s=1:nbrOfSetups
-            data_all = [data_all; results_best_users_raw.(freq_str_plot).(ris_flag_plot).(char(prec)){l,s}(:)];
-        end    
+    % ---------- Peores Usuarios ----------
+    figure('Name', ['CDF: Peores Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']); hold on; box on; grid on;
+    for prec = precoders
+        data = results_worst_user_raw.(freq_str_plot).(ris_flag_plot).(char(prec));
+        data_vec = data(:);
+        plot(sort(data_vec), linspace(0,1,length(data_vec))', ...
+            [colors_prec(char(prec)) '-'], 'DisplayName', [char(prec) ' (Peor)']);
     end
-    plot(sort(data_all), linspace(0,1,length(data_all))', ...
-        [colors_prec(char(prec)) '--'], 'DisplayName', [char(prec) ' (Best)']);
-end
-xlabel('SE [bit/s/Hz]'); ylabel('CDF');
-title('CDF - Best Users'); legend('Location','SouthEast');
-savefig('CDF_BestUsers.fig');
+    xlabel('SE [bit/s/Hz]'); ylabel('CDF');
+    title(['CDF - Peores Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']); 
+    legend('Location','SouthEast');
+    savefig(['CDF_WorstUsers_' freq_str_plot '.fig']);
 
-% ---------- All Users ----------
-figure('Name', 'CDF: All Users'); hold on; box on; grid on;
-for prec = precoders
-    data_all = [];
-    for l=1:L
-        for s=1:nbrOfSetups
-            data_all = [data_all; results_all_users_raw.(freq_str_plot).(ris_flag_plot).(char(prec)){l,s}(:)];
-        end 
+    % ---------- Mejores Usuarios ----------
+    figure('Name', ['CDF: Mejores Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']); hold on; box on; grid on;
+    for prec = precoders
+        data_all = [];
+        for l=1:L
+            for s=1:nbrOfSetups
+                data_all = [data_all; results_best_users_raw.(freq_str_plot).(ris_flag_plot).(char(prec)){l,s}(:)];
+            end    
+        end
+        plot(sort(data_all), linspace(0,1,length(data_all))', ...
+            [colors_prec(char(prec)) '--'], 'DisplayName', [char(prec) ' (Mejor)']);
     end
-    plot(sort(data_all), linspace(0,1,length(data_all))', [colors_prec(char(prec)) ':'], 'DisplayName', [char(prec) ' (All)']);
-end
-xlabel('SE [bit/s/Hz]'); ylabel('CDF');
-title('CDF - All Users'); legend('Location','SouthEast');
-savefig('CDF_AllUsers.fig');
+    xlabel('SE [bit/s/Hz]'); ylabel('CDF');
+    title(['CDF - Mejores Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']);
+    legend('Location','SouthEast');
+    savefig(['CDF_BestUsers_' freq_str_plot '.fig']);
 
-%% --- GUARDAR DATOS --- %%
-save('SE_WorstUser_RIS_data.mat', 'results_worst_user_raw');
-save('SE_BestUsers_RIS_data.mat', 'results_best_users_raw');
-save('SE_AllUsers_RIS_data.mat', 'results_all_users_raw');
-fprintf("Datos guardados correctamente.\n");
+    % ---------- Todos los Usuarios ----------
+    figure('Name', ['CDF: Todos los Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']); hold on; box on; grid on;
+    for prec = precoders
+        data_all = [];
+        for l=1:L
+            for s=1:nbrOfSetups
+                data_all = [data_all; results_all_users_raw.(freq_str_plot).(ris_flag_plot).(char(prec)){l,s}(:)];
+            end 
+        end
+        plot(sort(data_all), linspace(0,1,length(data_all))', ...
+            [colors_prec(char(prec)) ':'], 'DisplayName', [char(prec) ' (Todos)']);
+    end
+    xlabel('SE [bit/s/Hz]'); ylabel('CDF');
+    title(['CDF - Todos los Usuarios @ ', num2str(plot_frequency/1e9), ' GHz']);
+    legend('Location','SouthEast');
+    savefig(['CDF_AllUsers_' freq_str_plot '.fig']);
+
+    % Guardar datos para cada frecuencia
+    save(['SE_WorstUser_RIS_data_' freq_str_plot '.mat'], 'results_worst_user_raw');
+    save(['SE_BestUsers_RIS_data_' freq_str_plot '.mat'], 'results_best_users_raw');
+    save(['SE_AllUsers_RIS_data_' freq_str_plot '.mat'], 'results_all_users_raw');
+end
+
+fprintf("Todas las figuras y datos fueron guardados correctamente por frecuencia.\n");
