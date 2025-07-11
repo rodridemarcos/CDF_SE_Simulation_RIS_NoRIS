@@ -17,7 +17,7 @@ tau_c = 200;
 tau_p = K;
 ASDdeg = 10; 
 f = 1;
-frequencies = [2e9, 8e9, 28e9];
+frequencies = [2e9, 8e9, 15e9, 28e9];
 precoders_to_run = {'MR', 'MMMSE', 'RZF'};
 
 scenario = 'UMi';
