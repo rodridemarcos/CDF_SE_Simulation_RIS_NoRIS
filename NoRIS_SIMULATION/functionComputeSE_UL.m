@@ -1,27 +1,23 @@
-function [SE_MR,SE_RZF,SE_MMMSE] = functionComputeSE_UL(Hhat,C,R,tau_c,tau_p,nbrOfRealizations,M,K,L,p, N0)
-%Compute UL SE for different receive combining schemes using Theorem 4.1.
+function [SE_MR,SE_RZF,SE_MMMSE] = functionComputeSE_UL(Hhat,C,R,tau_c,tau_p,nbrOfRealizations,M,K,L,p, N0) 
+% Calcula la SE en el enlace ascendente para diferentes esquemas de combinación usando el Teorema 4.1.
 %
-%INPUT:
-%Hhat              = M x nbrOfRealizations x K x L x L matrix with the MMSE
-%                      channel estimates
-%C                 = M x M x K x L x L matrix with estimation error
-%                      correlation matrices when using MMSE estimation
-%R                 = M x M x K x L x L matrix with spatial correlation
-%                      matrices
-%tau_c             = Length of coherence block
-%tau_p             = Length of pilot sequences
-%nbrOfRealizations = Number of channel realizations
-%M                 = Number of antennas per BS
-%K                 = Number of UEs per cell
-%L                 = Number of BSs and cells
-%p                 = Uplink transmit power per UE (same for everyone)
-%N0                = Noise variance (in Watts)
+% ENTRADA:
+% Hhat              = Matriz M x nbrOfRealizations x K x L x L con las estimaciones de canal MMSE
+% C                 = Matriz M x M x K x L x L con las matrices de correlación del error de estimación usando MMSE
+% R                 = Matriz M x M x K x L x L con matrices de correlación espacial
+% tau_c             = Longitud del bloque de coherencia
+% tau_p             = Longitud de las secuencias piloto
+% nbrOfRealizations = Número de realizaciones del canal
+% M                 = Número de antenas por estación base (BS)
+% K                 = Número de usuarios por celda (UE)
+% L                 = Número de estaciones base y celdas
+% p                 = Potencia de transmisión en el enlace ascendente por usuario (igual para todos)
+% N0                = Varianza del ruido (en Watts)
 %
-%OUTPUT:
-%SE_MR      = K x L matrix where element (k,l) is the uplink SE of UE k in
-%             cell l achieved with MR combining
-%SE_RZF     = Same as SE_MR but with RZF combining
-%SE_MMMSE   = Same as SE_MR but with M-MMSE combining
+% SALIDA:
+% SE_MR      = Matriz K x L donde el elemento (k,l) es la SE UL del usuario k en la celda l obtenida con combinación MR
+% SE_RZF     = Igual que SE_MR pero con combinación RZF
+% SE_MMMSE   = Igual que SE_MR pero con combinación M-MMSE
 %
 %
 %This Matlab function was developed to generate simulation results to:
@@ -40,15 +36,15 @@ function [SE_MR,SE_RZF,SE_MMMSE] = functionComputeSE_UL(Hhat,C,R,tau_c,tau_p,nbr
 %monograph as described above.
 
 
-%Store identity matrices of different sizes
+% Almacenar matrices identidad de diferentes tamaños
 eyeK = eye(K);
 eyeM = eye(M);
 
-%Compute the pre-log factor (normalized with number of channel realizations)
-%assuming only uplink transmission
+% Calcular el factor pre-log (normalizado con el número de realizaciones del canal)
+% asumiendo solo transmisión en el enlace ascendente
 prelogFactor = (tau_c-tau_p)/(tau_c*nbrOfRealizations);
 
-%Prepare to store simulation results
+% Preparar espacio para almacenar los resultados de la simulación
 SE_MR = zeros(K,L);
 
 if nargout > 1
@@ -58,72 +54,68 @@ end
 if nargout > 2
     SE_MMMSE = zeros(K,L);
     
-    %Compute sum of all estimation error correlation matrices at every BS
+    % Calcular la suma de todas las matrices de correlación del error de estimación en cada BS
     C_totM = reshape(p*sum(sum(C,3),4),[M M L]);
     
 end
 
-%% Go through all channel realizations
+%% Recorrer todas las realizaciones del canal
 for n = 1:nbrOfRealizations
     
-    %Go through all cells
+    % Recorrer todas las celdas
     for j = 1:L
         
-        %Extract channel estimate realizations from all UEs to BS j
+        % Extraer las realizaciones de la estimación de canal de todos los UEs hacia la BS j
         Hhatallj = reshape(Hhat(:,n,:,:,j),[M K*L]);
         
-        %Compute MR combining in (4.11)
+        % Calcular la combinación MR en (4.11)
         V_MR = Hhatallj(:,K*(j-1)+1:K*j);
         
-        if nargout > 1 %Compute RZF combining in (4.9)
+        if nargout > 1 % Calcular la combinación RZF en (4.9)
             V_RZF = (p * V_MR) / (p * (V_MR' * V_MR) + eyeK);
         end
         
-        if nargout > 2 %Compute M-MMSE combining in (4.7)
+        if nargout > 2 % Calcular la combinación M-MMSE en (4.7)
             V_MMMSE = (p * (Hhatallj * Hhatallj') + C_totM(:,:,j) + N0*eyeM) \ (p * V_MR);
         end
                 
-        
-        %Go through all UEs in cell j
+        % Recorrer todos los UEs en la celda j
         for k = 1:K
             
-            %%MR combining
-            v = V_MR(:,k); %Extract combining vector
+            %% Combinación MR
+            v = V_MR(:,k); % Extraer el vector de combinación
             
-            %Compute numerator and denominator of instantaneous SINR in (4.3)
+            % Calcular numerador y denominador del SINR instantáneo en (4.3)
             numerator = p*abs(v'*Hhat(:,n,k,j,j))^2;
             denominator = p*sum(abs(v'*Hhatallj).^2) + v'*(C_totM(:,:,j)+N0*eyeM)*v - numerator;
             
-            %Compute instantaneous SE for one channel realization
+            % Calcular la SE instantánea para una realización del canal
             SE_MR(k,j) = SE_MR(k,j) + prelogFactor*real(log2(1+numerator/denominator));
-            
                     
-            
-            %%RZF combining
+            %% Combinación RZF
             if nargout > 1
                 
-                v = V_RZF(:,k); %Extract combining vector
+                v = V_RZF(:,k); % Extraer el vector de combinación
                 
-                %Compute numerator and denominator of instantaneous SINR in (4.3)
+                % Calcular numerador y denominador del SINR instantáneo en (4.3)
                 numerator = p*abs(v'*Hhat(:,n,k,j,j))^2;
                 denominator = p*sum(abs(v'*Hhatallj).^2) + v'*(C_totM(:,:,j)+N0*eyeM)*v - numerator;
                 
-                %Compute instantaneous SE for one channel realization
+                % Calcular la SE instantánea para una realización del canal
                 SE_RZF(k,j) = SE_RZF(k,j) + prelogFactor*real(log2(1+numerator/denominator));
                 
             end
             
-            
-            %%M-MMSE combining
+            %% Combinación M-MMSE
             if nargout > 2
                 
-                v = V_MMMSE(:,k); %Extract combining vector
+                v = V_MMMSE(:,k); % Extraer el vector de combinación
                 
-                %Compute numerator and denominator of instantaneous SINR in (4.3)
+                % Calcular numerador y denominador del SINR instantáneo en (4.3)
                 numerator = p*abs(v'*Hhat(:,n,k,j,j))^2;
                 denominator = p*sum(abs(v'*Hhatallj).^2) + v'*(C_totM(:,:,j)+N0*eyeM)*v - numerator;
                 
-                %Compute instantaneous SE for one channel realization
+                % Calcular la SE instantánea para una realización del canal
                 SE_MMMSE(k,j) = SE_MMMSE(k,j) + prelogFactor*real(log2(1+numerator/denominator));
                 
             end
