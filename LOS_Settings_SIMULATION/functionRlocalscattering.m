@@ -1,15 +1,14 @@
 function R = functionRlocalscattering(M,angleofdeparture,ASDdeg,antennaSpacing)
-%Calculates the spatial correlation matrix based on the local scattering
-%model.
+% Calcula la matriz de correlación espacial basada en el modelo de dispersión local.
 %
-%INPUT:
-%M                 = Number of antennas
-%angleofdeparture  = Nominal angle of departure (in radians)
-%ASDdeg            = Angular standard deviation (in degrees)
-%antennaSpacing    = Antenna spacing (in number of wavelengths)
+% ENTRADAS:
+% M                 = Número de antenas
+% angleofdeparture  = Ángulo nominal de salida (en radianes)
+% ASDdeg            = Desviación estándar angular (en grados)
+% antennaSpacing    = Espaciado de antenas (en número de longitudes de onda)
 %
-%OUTPUT:
-%R                 = M x M spatial correlation matrix
+% SALIDA:
+% R                 = Matriz de correlación espacial M x M
 %
 %
 %This Matlab function was developed to generate simulation results to:
@@ -28,26 +27,26 @@ function R = functionRlocalscattering(M,angleofdeparture,ASDdeg,antennaSpacing)
 %monograph as described above.
 
 
-%Convert ASD from degrees to radians
+% Convertir ASD de grados a radianes
 ASD = ASDdeg*pi/180;
 
-%Prepare matrix for output
+% Preparar matriz para la salida
 R = zeros(M,M);
 
-%Go through all pairs of antennas
+% Recorrer todos los pares de antenas
 for m1 = 1:M
     for m2 = 1:M
 
-        %Calculate the distance between the antennas
+        % Calcular la distancia entre las antenas
         delta_m = (m1-m2)*antennaSpacing;
 
-        %Calculate the spatial correlation according to (2.15) in the monograph
+        % Calcular la correlación espacial de acuerdo con (2.15) del monográfico
         R(m1,m2) = besselj(0,2*pi*delta_m*sin(ASD/2));
 
     end
 end
 
-%Rotate the correlation matrix according to the nominal angle of departure
+% Rotar la matriz de correlación de acuerdo al ángulo nominal de salida
 varphi = (0:M-1)'*2*pi*antennaSpacing*sin(angleofdeparture);
 rotationVector = exp(1i*varphi);
 R = rotationVector*rotationVector'.*R;
