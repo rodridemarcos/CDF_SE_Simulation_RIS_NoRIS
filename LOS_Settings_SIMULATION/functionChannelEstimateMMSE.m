@@ -1,5 +1,5 @@
 function [Hhat_MMSE, C_MMSE] = functionChannelEstimateMMSE(R,HMeanx,H,nbrOfRealizations,M,K,L,p,f,tau_p)
-%Generating MMSE channel estimates
+% Generación de estimaciones de canal MMSE
 %
 %This Matlab function was developed to generate simulation results to:
 %
@@ -16,64 +16,60 @@ function [Hhat_MMSE, C_MMSE] = functionChannelEstimateMMSE(R,HMeanx,H,nbrOfReali
 %original article listed above.
 
 
-%Reshape the mean vectors to get same mean vector for all realizations
+% Remodelar los vectores promedio para obtener el mismo vector promedio para todas las realizaciones
 HMean=reshape(repmat(HMeanx,nbrOfRealizations,1),M,nbrOfRealizations,K,L,L);
 
-%Generate pilot pattern
+% Generar el patrón de pilotos
 if f == 1
     pilotPattern = ones(L,1);
-elseif f == 2 %Only works in the running example with its 16 BSs
+elseif f == 2 % Solo funciona en el ejemplo ejecutándose con sus 16 BSs
     pilotPattern = kron(ones(2,1),[1; 2; 1; 2; 2; 1; 2; 1]);
-elseif f == 4 %Only works in the running example with its 16 BSs
+elseif f == 4 % Solo funciona en el ejemplo ejecutándose con sus 16 BSs
     pilotPattern = kron(ones(2,1),[1; 2; 1; 2; 3; 4; 3; 4]);
-elseif f == 16 %Only works in the running example with its 16 BSs
+elseif f == 16 % Solo funciona en el ejemplo ejecutándose con sus 16 BSs
     pilotPattern = (1:L)';
 end
 
-
-%Store identity matrix of size M x M
+% Almacenar matriz identidad de tamaño M x M
 eyeM = eye(M);
 
-%Generate realizations of normalized noise
+% Generar realizaciones de ruido normalizado
 Np = sqrt(0.5)*(randn(M,nbrOfRealizations,K,L,f) + 1i*randn(M,nbrOfRealizations,K,L,f));
 
-
-%Prepare to store MMSE channel estimates
+% Preparar espacio para almacenar las estimaciones MMSE del canal
 Hhat_MMSE = zeros(M,nbrOfRealizations,K,L,L);
 
-%Prepare to store the MMSE error covariance matrices
+% Preparar espacio para almacenar las matrices de covarianza de error MMSE
 C_MMSE = zeros(M, M, K, L, L); % Inicializar C_MMSE
 
-% Go through all cells
+% Recorrer todas las celdas
 for j = 1:L
 
-    %Go through all f pilot groups
+    % Recorrer todos los grupos de pilotos f
     for g = 1:f
 
-        %Extract the cells that belong to pilot group g
+        % Extraer las celdas que pertenecen al grupo de pilotos g
         groupMembers = find(g==pilotPattern)';
 
-        %Compute processed pilot signal for all UEs that use these pilots, according to (5)
+        % Calcular la señal de piloto procesada para todos los UEs que usan estos pilotos, según (5)
         yp = sqrt(p)*tau_p*sum(H(:,:,:,g==pilotPattern,j),4) + sqrt(tau_p)*Np(:,:,:,j,g);
         yMean=sqrt(p)*tau_p*sum(HMean(:,:,:,g==pilotPattern,j),4);
-        %Go through all UEs
+        % Recorrer todos los UEs
         for k = 1:K
 
-            %Compute the matrix that is inverted in the MMSE estimator
+            % Calcular la matriz que se invierte en el estimador MMSE
             PsiInv = (p*tau_p*sum(R(:,:,k,g==pilotPattern,j),4) + eyeM);
 
-
-            %Go through the cells in pilot group g
+            % Recorrer las celdas en el grupo de pilotos g
             for l = groupMembers
 
-                %Compute MMSE estimate of channel between BS l and UE k in
-                %cell j using (6) in Lemma 1
+                % Calcular la estimación MMSE del canal entre la BS l y el UE k en
+                % la celda j usando (6) en el Lema 1
                 RPsi = R(:,:,k,l,j) / PsiInv;
                 Hhat_MMSE(:,:,k,l,j) = HMean(:,:,k,l,j) + sqrt(p)*RPsi*(yp(:,:,k)-yMean(:,:,k));
 
-                %Compute the MMSE error covariance matrix using (8) in Lemma 1
+                % Calcular la matriz de covarianza de error MMSE usando (8) en el Lema 1
                 C_MMSE(:,:,k,l,j) = R(:,:,k,l,j) - p*tau_p*RPsi*R(:,:,k,l,j);
-
 
             end
 
