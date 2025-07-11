@@ -1,3 +1,3 @@
 # CDF_SE_Simulation_RIS_NoRIS
 
-This project is made by Marcos Rodrigo Bermejo Arroyo
+Matlab code developed by Marcos Rodrigo Bermejo Arroyo.
