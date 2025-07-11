@@ -1,8 +1,8 @@
 function PL = calculatePathLoss_UMi(frequency, distance, d_bp, hBS, hMS, isLOS)
-    % Helper function to calculate path loss based on UMi scenario and LoS
+    % Función auxiliar para calcular la pérdida de propagación según el escenario UMi y LoS
     
-    fc_GHz = frequency / 1e9; % Convert frequency to GHz
-    d3D = distance; % Assuming 3D distance is the same as 2D for simplicity here
+    fc_GHz = frequency / 1e9; % Convertir la frecuencia a GHz
+    d3D = distance; % Suponiendo que la distancia 3D es igual a la 2D por simplicidad aquí
     
     if isLOS == 1
         if distance >= 10 && distance <= d_bp
